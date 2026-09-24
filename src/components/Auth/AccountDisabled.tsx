@@ -8,7 +8,7 @@ export function AccountDisabled() {
                 <div className="text-center mb-8">
                     <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 rounded-2xl items-center justify-center mb-4 shadow-lg shadow-indigo-500/50 inline-flex p-0.5">
                         <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                            <span className="text-white text-3xl font-black italic tracking-tighter">CF</span>
+                            <span className="text-white text-3xl font-black tracking-tighter">G</span>
                         </div>
                     </div>
                     <h1 className="text-white text-3xl font-bold tracking-tight">Gestio</h1>
