@@ -17,6 +17,7 @@ import {
   INITIAL_MOVEMENTS,
   INITIAL_CUSTOMERS
 } from '../data/mockData';
+import { useAuth } from './AuthContext';
 import type { ToastMessage } from '../components/Toast';
 
 interface AppContextType {
@@ -65,63 +66,76 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const userId = user ? user.id : 'guest';
+
   const [financialPeriod, setFinancialPeriod] = useState<FinancialPeriod>('mensual');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('gestio_products');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
-  });
+  const [products, setProducts] = useState<Product[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [payroll, setPayroll] = useState<WorkerPayroll[]>([]);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
-  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(() => {
-    const saved = localStorage.getItem('gestio_raw_materials');
-    return saved ? JSON.parse(saved) : INITIAL_RAW_MATERIALS;
-  });
-
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('gestio_expenses');
-    return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
-  });
-
-  const [payroll, setPayroll] = useState<WorkerPayroll[]>(() => {
-    const saved = localStorage.getItem('gestio_payroll');
-    return saved ? JSON.parse(saved) : INITIAL_PAYROLL;
-  });
-
-  const [movements, setMovements] = useState<StockMovement[]>(() => {
-    const saved = localStorage.getItem('gestio_movements');
-    return saved ? JSON.parse(saved) : INITIAL_MOVEMENTS;
-  });
-
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem('gestio_customers');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMERS;
-  });
-
-  // Sync to local storage
+  // Load user-scoped data whenever logged-in user changes (Multi-Tenancy Data Isolation)
   useEffect(() => {
-    localStorage.setItem('gestio_products', JSON.stringify(products));
-  }, [products]);
+    const savedProducts = localStorage.getItem(`gestio_products_${userId}`);
+    setProducts(savedProducts ? JSON.parse(savedProducts) : INITIAL_PRODUCTS);
 
+    const savedRaw = localStorage.getItem(`gestio_raw_materials_${userId}`);
+    setRawMaterials(savedRaw ? JSON.parse(savedRaw) : INITIAL_RAW_MATERIALS);
+
+    const savedExp = localStorage.getItem(`gestio_expenses_${userId}`);
+    setExpenses(savedExp ? JSON.parse(savedExp) : INITIAL_EXPENSES);
+
+    const savedPay = localStorage.getItem(`gestio_payroll_${userId}`);
+    setPayroll(savedPay ? JSON.parse(savedPay) : INITIAL_PAYROLL);
+
+    const savedMov = localStorage.getItem(`gestio_movements_${userId}`);
+    setMovements(savedMov ? JSON.parse(savedMov) : INITIAL_MOVEMENTS);
+
+    const savedCust = localStorage.getItem(`gestio_customers_${userId}`);
+    setCustomers(savedCust ? JSON.parse(savedCust) : INITIAL_CUSTOMERS);
+  }, [userId]);
+
+  // Sync user-scoped data to local storage per company
   useEffect(() => {
-    localStorage.setItem('gestio_raw_materials', JSON.stringify(rawMaterials));
-  }, [rawMaterials]);
+    if (userId !== 'guest') {
+      localStorage.setItem(`gestio_products_${userId}`, JSON.stringify(products));
+    }
+  }, [products, userId]);
 
   useEffect(() => {
-    localStorage.setItem('gestio_expenses', JSON.stringify(expenses));
-  }, [expenses]);
+    if (userId !== 'guest') {
+      localStorage.setItem(`gestio_raw_materials_${userId}`, JSON.stringify(rawMaterials));
+    }
+  }, [rawMaterials, userId]);
 
   useEffect(() => {
-    localStorage.setItem('gestio_payroll', JSON.stringify(payroll));
-  }, [payroll]);
+    if (userId !== 'guest') {
+      localStorage.setItem(`gestio_expenses_${userId}`, JSON.stringify(expenses));
+    }
+  }, [expenses, userId]);
 
   useEffect(() => {
-    localStorage.setItem('gestio_movements', JSON.stringify(movements));
-  }, [movements]);
+    if (userId !== 'guest') {
+      localStorage.setItem(`gestio_payroll_${userId}`, JSON.stringify(payroll));
+    }
+  }, [payroll, userId]);
 
   useEffect(() => {
-    localStorage.setItem('gestio_customers', JSON.stringify(customers));
-  }, [customers]);
+    if (userId !== 'guest') {
+      localStorage.setItem(`gestio_movements_${userId}`, JSON.stringify(movements));
+    }
+  }, [movements, userId]);
+
+  useEffect(() => {
+    if (userId !== 'guest') {
+      localStorage.setItem(`gestio_customers_${userId}`, JSON.stringify(customers));
+    }
+  }, [customers, userId]);
 
   // Toast Helpers
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {

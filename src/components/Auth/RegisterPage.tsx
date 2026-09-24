@@ -154,50 +154,17 @@ export function RegisterPage({ onToggleMode }: RegisterPageProps) {
                             />
                         </div>
 
-                        {/* Role Selection */}
-                        <div className="mb-4">
-                            <label className="text-neutral-400 text-xs font-medium mb-2.5 block">Tipo de Cuenta</label>
-                            <div className="flex-row gap-x-2 flex">
-                                <button
-                                    type="button"
-                                    onClick={() => updateForm({ role: 'company' })}
-                                    className={`flex-1 py-3 rounded-xl border items-center justify-center transition-colors ${formState.role === 'company'
-                                            ? 'bg-indigo-600/10 border-indigo-500'
-                                            : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
-                                        }`}
-                                >
-                                    <span className={`text-sm font-medium ${formState.role === 'company' ? 'text-indigo-400' : 'text-neutral-400'}`}>
-                                        Empresa
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => updateForm({ role: 'admin' })}
-                                    className={`flex-1 py-3 rounded-xl border items-center justify-center transition-colors ${formState.role === 'admin'
-                                            ? 'bg-indigo-600/10 border-indigo-500'
-                                            : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
-                                        }`}
-                                >
-                                    <span className={`text-sm font-medium ${formState.role === 'admin' ? 'text-indigo-400' : 'text-neutral-400'}`}>
-                                        Admin
-                                    </span>
-                                </button>
-                            </div>
+                        {/* Company Name Input */}
+                        <div className="mb-6">
+                            <label className="text-neutral-400 text-xs font-medium mb-2 block">Nombre de la Empresa</label>
+                            <input
+                                type="text"
+                                value={formState.companyName}
+                                onChange={(e) => updateForm({ companyName: e.target.value })}
+                                placeholder="Ej. Mi Negocio / Ferretería El Sol"
+                                className="w-full bg-neutral-950 border border-neutral-800 text-white rounded-xl px-4 py-3.5 text-sm focus:border-indigo-500 focus:outline-none transition-colors"
+                            />
                         </div>
-
-                        {/* Company Name Input (Only for Company Role) */}
-                        {formState.role === 'company' && (
-                            <div className="mb-6">
-                                <label className="text-neutral-400 text-xs font-medium mb-2 block">Nombre de la Empresa</label>
-                                <input
-                                    type="text"
-                                    value={formState.companyName}
-                                    onChange={(e) => updateForm({ companyName: e.target.value })}
-                                    placeholder="Nombre de tu empresa"
-                                    className="w-full bg-neutral-950 border border-neutral-800 text-white rounded-xl px-4 py-3.5 text-sm focus:border-indigo-500 focus:outline-none transition-colors"
-                                />
-                            </div>
-                        )}
 
                         {/* Submit Button */}
                         <button
