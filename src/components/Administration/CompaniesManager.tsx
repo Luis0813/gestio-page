@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Building2, Check, X, Loader2, RefreshCw, Calendar, Clock } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import api from '../../api';
 
 interface Company {
     id: number;
@@ -12,7 +12,6 @@ interface Company {
 }
 
 export function CompaniesManager() {
-    const { token } = useAuth();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -22,24 +21,14 @@ export function CompaniesManager() {
         try {
             setLoading(true);
             setError('');
-            const response = await fetch('http://localhost:3000/companies', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setCompanies(data.data);
-            } else if (response.status === 401) {
+            const response = await api.get('/companies');
+            setCompanies(response.data.data);
+        } catch (err: any) {
+            if (err.response?.status === 401) {
                 setError('Sesión no autorizada o expirada. Por favor cierra sesión y vuelve a ingresar.');
             } else {
-                setError(data.status?.message || 'Error al cargar empresas.');
+                setError(err.response?.data?.status?.message || 'Error al cargar empresas.');
             }
-        } catch (err) {
-            setError('Error de conexión con el servidor.');
         } finally {
             setLoading(false);
         }
@@ -48,28 +37,15 @@ export function CompaniesManager() {
     const toggleCompanyStatus = async (companyId: number, currentStatus: boolean) => {
         try {
             setUpdatingId(companyId);
-            const response = await fetch(`http://localhost:3000/companies/${companyId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    user: { active: !currentStatus }
-                })
+            await api.patch(`/companies/${companyId}`, {
+                user: { active: !currentStatus }
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                setCompanies(prev => prev.map(c =>
-                    c.id === companyId ? { ...c, active: !currentStatus } : c
-                ));
-            } else {
-                setError(data.status?.message || 'Error al actualizar empresa.');
-            }
-        } catch (err) {
-            setError('Error de conexión con el servidor.');
+            setCompanies(prev => prev.map(c =>
+                c.id === companyId ? { ...c, active: !currentStatus } : c
+            ));
+        } catch (err: any) {
+            setError(err.response?.data?.status?.message || 'Error al actualizar empresa.');
         } finally {
             setUpdatingId(null);
         }
@@ -85,31 +61,18 @@ export function CompaniesManager() {
             // Extend 1 month
             const newExp = new Date(baseDate.setMonth(baseDate.getMonth() + 1)).toISOString();
 
-            const response = await fetch(`http://localhost:3000/companies/${companyId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    user: {
-                        active: true,
-                        membership_expires_at: newExp
-                    }
-                })
+            await api.patch(`/companies/${companyId}`, {
+                user: {
+                    active: true,
+                    membership_expires_at: newExp
+                }
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                setCompanies(prev => prev.map(c =>
-                    c.id === companyId ? { ...c, active: true, membership_expires_at: newExp } : c
-                ));
-            } else {
-                setError(data.status?.message || 'Error al extender membresía.');
-            }
-        } catch (err) {
-            setError('Error de conexión con el servidor.');
+            setCompanies(prev => prev.map(c =>
+                c.id === companyId ? { ...c, active: true, membership_expires_at: newExp } : c
+            ));
+        } catch (err: any) {
+            setError(err.response?.data?.status?.message || 'Error al extender membresía.');
         } finally {
             setUpdatingId(null);
         }

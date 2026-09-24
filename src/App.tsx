@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from './api';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
@@ -78,16 +79,13 @@ const MainApp: React.FC = () => {
         try {
           const token = localStorage.getItem('gestio_token');
           if (token) {
-            const response = await fetch('http://localhost:3000/me', {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+            try {
+              await api.get('/me');
+            } catch (err: any) {
+              if (err.response?.status === 401 || err.response?.status === 403) {
+                // Account is disabled or token invalid/expired, clear session
+                await logout();
               }
-            });
-
-            if (response.status === 401 || response.status === 403) {
-              // Account is disabled or token invalid/expired, clear session
-              await logout();
             }
           }
         } catch (err) {

@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import api from '../api';
+import { AxiosError } from 'axios';
 
 export type UserRole = 'admin' | 'company';
 
@@ -24,8 +26,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_URL = 'http://localhost:3000';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
@@ -40,17 +40,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 if (storedToken && storedUser) {
                     // Verify token with backend
-                    const response = await fetch(`${API_URL}/me`, {
-                        headers: {
-                            'Authorization': `Bearer ${storedToken}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (response.ok) {
+                    try {
+                        await api.get('/me');
                         setToken(storedToken);
                         setUser(JSON.parse(storedUser));
-                    } else {
+                    } catch (err) {
                         // Stale or expired token
                         localStorage.removeItem('gestio_token');
                         localStorage.removeItem('gestio_user');
@@ -66,25 +60,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loadStorageData();
     }, []);
 
+    const logout = useCallback(async () => {
+        try {
+            if (localStorage.getItem('gestio_token')) {
+                await api.delete('/logout');
+            }
+        } catch (error) {
+            console.error('Logout request failed:', error);
+        } finally {
+            localStorage.removeItem('gestio_token');
+            localStorage.removeItem('gestio_user');
+            setToken(null);
+            setUser(null);
+            setIsAccountDisabled(false);
+        }
+    }, []);
+
     const checkAccountStatus = useCallback(async () => {
-        if (!token) return;
+        const currentToken = localStorage.getItem('gestio_token');
+        if (!currentToken) return;
 
         try {
-            const response = await fetch(`${API_URL}/me`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.status === 401 || response.status === 403) {
+            await api.get('/me');
+        } catch (err: any) {
+            if (err.response?.status === 401 || err.response?.status === 403) {
                 // Account is disabled or token invalid/expired, log out
                 await logout();
             }
-        } catch (err) {
-            console.error('Error checking account status:', err);
         }
-    }, [token]);
+    }, [logout]);
 
     // Check account status every 30 seconds when user is logged in
     useEffect(() => {
@@ -99,36 +103,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = async (email: string, password: string) => {
         try {
-            const response = await fetch(`${API_URL}/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user: { email, password } }),
-            });
+            const response = await api.post('/login', { user: { email, password } });
 
-            const data = await response.json();
+            const headers = response.headers as Record<string, any>;
+            const authHeader: string = typeof headers.authorization === 'string'
+                ? headers.authorization
+                : typeof headers.get === 'function'
+                ? headers.get('authorization')
+                : '';
+            const tokenString = authHeader ? authHeader.replace('Bearer ', '') : '';
 
-            if (response.ok) {
-                const authHeader = response.headers.get('Authorization');
-                const tokenString = authHeader ? authHeader.replace('Bearer ', '') : '';
-
-                if (tokenString) {
-                    localStorage.setItem('gestio_token', tokenString);
-                    localStorage.setItem('gestio_user', JSON.stringify(data.data));
-                    setToken(tokenString);
-                    setUser(data.data);
-                    setIsAccountDisabled(false);
-                    return { success: true };
-                }
-                return { success: false, error: 'No token returned from server.' };
-            } else if (response.status === 403) {
-                setIsAccountDisabled(true);
-                return { success: false, error: data.status?.message || 'Your account has been disabled.', disabled: true };
-            } else {
-                return { success: false, error: data.error || 'Invalid credentials.' };
+            if (tokenString) {
+                localStorage.setItem('gestio_token', tokenString);
+                localStorage.setItem('gestio_user', JSON.stringify(response.data.data));
+                setToken(tokenString);
+                setUser(response.data.data);
+                setIsAccountDisabled(false);
+                return { success: true };
             }
+            return { success: false, error: 'No token returned from server.' };
         } catch (error: any) {
-            console.error(error);
-            return { success: false, error: 'Network error connecting to backend.' };
+            const err = error as AxiosError<any>;
+            if (err.response?.status === 403) {
+                setIsAccountDisabled(true);
+                return { success: false, error: err.response.data?.status?.message || 'Your account has been disabled.', disabled: true };
+            } else {
+                return { success: false, error: err.response?.data?.error || 'Invalid credentials.' };
+            }
         }
     };
 
@@ -144,54 +145,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 userData.company_name = companyName;
             }
 
-            const response = await fetch(`${API_URL}/signup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user: userData }),
-            });
+            const response = await api.post('/signup', { user: userData });
 
-            const data = await response.json();
+            const headers = response.headers as Record<string, any>;
+            const authHeader: string = typeof headers.authorization === 'string'
+                ? headers.authorization
+                : typeof headers.get === 'function'
+                ? headers.get('authorization')
+                : '';
+            const tokenString = authHeader ? authHeader.replace('Bearer ', '') : '';
 
-            if (response.ok) {
-                const authHeader = response.headers.get('Authorization');
-                const tokenString = authHeader ? authHeader.replace('Bearer ', '') : '';
-
-                if (tokenString) {
-                    localStorage.setItem('gestio_token', tokenString);
-                    localStorage.setItem('gestio_user', JSON.stringify(data.data));
-                    setToken(tokenString);
-                    setUser(data.data);
-                    setIsAccountDisabled(false);
-                }
-                return { success: true };
-            } else {
-                return { success: false, error: data.status?.message || 'Failed to sign up.' };
+            if (tokenString) {
+                localStorage.setItem('gestio_token', tokenString);
+                localStorage.setItem('gestio_user', JSON.stringify(response.data.data));
+                setToken(tokenString);
+                setUser(response.data.data);
+                setIsAccountDisabled(false);
             }
-        } catch (error) {
-            console.error(error);
-            return { success: false, error: 'Network error connecting to backend.' };
-        }
-    };
-
-    const logout = async () => {
-        try {
-            if (token) {
-                await fetch(`${API_URL}/logout`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                });
-            }
-        } catch (error) {
-            console.error('Logout request failed:', error);
-        } finally {
-            localStorage.removeItem('gestio_token');
-            localStorage.removeItem('gestio_user');
-            setToken(null);
-            setUser(null);
-            setIsAccountDisabled(false);
+            return { success: true };
+        } catch (error: any) {
+            const err = error as AxiosError<any>;
+            return { success: false, error: err.response?.data?.status?.message || 'Failed to sign up.' };
         }
     };
 
