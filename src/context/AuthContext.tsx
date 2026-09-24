@@ -68,8 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error) {
             console.error('Logout request failed:', error);
         } finally {
-            localStorage.removeItem('gestio_token');
-            localStorage.removeItem('gestio_user');
+            localStorage.clear();
             setToken(null);
             setUser(null);
             setIsAccountDisabled(false);
