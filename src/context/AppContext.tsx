@@ -69,27 +69,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('gestio_products') || localStorage.getItem('chinafit_products');
+    const saved = localStorage.getItem('gestio_products');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
   });
 
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(() => {
-    const saved = localStorage.getItem('gestio_raw_materials') || localStorage.getItem('chinafit_raw_materials');
+    const saved = localStorage.getItem('gestio_raw_materials');
     return saved ? JSON.parse(saved) : INITIAL_RAW_MATERIALS;
   });
 
   const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('gestio_expenses') || localStorage.getItem('chinafit_expenses');
+    const saved = localStorage.getItem('gestio_expenses');
     return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
   });
 
   const [payroll, setPayroll] = useState<WorkerPayroll[]>(() => {
-    const saved = localStorage.getItem('gestio_payroll') || localStorage.getItem('chinafit_payroll');
+    const saved = localStorage.getItem('gestio_payroll');
     return saved ? JSON.parse(saved) : INITIAL_PAYROLL;
   });
 
   const [movements, setMovements] = useState<StockMovement[]>(() => {
-    const saved = localStorage.getItem('gestio_movements') || localStorage.getItem('chinafit_movements');
+    const saved = localStorage.getItem('gestio_movements');
     return saved ? JSON.parse(saved) : INITIAL_MOVEMENTS;
   });
 
