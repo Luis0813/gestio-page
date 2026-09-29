@@ -36,7 +36,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (quantity <= 0) return;
 
@@ -44,7 +44,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
     const customerObj = customers.find((c) => c.id === selectedCustomerId);
     const finalCustomerName = customerObj ? customerObj.name : customCustomerName.trim() || undefined;
 
-    addStockMovement({
+    await addStockMovement({
       productId: product.id,
       productName: product.name,
       type,

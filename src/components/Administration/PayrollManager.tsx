@@ -28,11 +28,11 @@ export const PayrollManager: React.FC = () => {
 
   const currentTotalCalculated = calculateTotalPaid(paymentType, baseRate, quantityOrHoursCompleted);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workerName.trim()) return;
 
-    addPayrollEntry({
+    await addPayrollEntry({
       workerName,
       role,
       paymentType,

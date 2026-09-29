@@ -44,8 +44,8 @@ export const RecipeCalculatorModal: React.FC<RecipeCalculatorModalProps> = ({
 
   const calculatedCost = calculateRecipeCost(recipeItems);
 
-  const handleSaveRecipe = () => {
-    updateProduct({
+  const handleSaveRecipe = async () => {
+    await updateProduct({
       ...product,
       costPrice: Number(calculatedCost.toFixed(2)),
       rawMaterialRecipe: recipeItems

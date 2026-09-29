@@ -9,7 +9,8 @@ import {
   Trash2,
   ChefHat,
   ShoppingBag,
-  Info
+  Info,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Product } from '../../types';
@@ -18,6 +19,7 @@ interface ProductListProps {
   searchTerm: string;
   onEditProduct: (product: Product) => void;
   onOpenNewProductModal: () => void;
+  onOpenImportModal: () => void;
   onOpenRecipeModal: (product: Product) => void;
   onOpenMovementModal: (product: Product) => void;
 }
@@ -26,6 +28,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   searchTerm,
   onEditProduct,
   onOpenNewProductModal,
+  onOpenImportModal,
   onOpenRecipeModal,
   onOpenMovementModal
 }) => {
@@ -52,9 +55,9 @@ export const ProductList: React.FC<ProductListProps> = ({
   const avgMarginPercent =
     filteredProducts.length > 0
       ? filteredProducts.reduce((acc, p) => {
-          const margin = p.salePrice > 0 ? ((p.salePrice - p.costPrice) / p.salePrice) * 100 : 0;
-          return acc + margin;
-        }, 0) / filteredProducts.length
+        const margin = p.salePrice > 0 ? ((p.salePrice - p.costPrice) / p.salePrice) * 100 : 0;
+        return acc + margin;
+      }, 0) / filteredProducts.length
       : 0;
 
   return (
@@ -96,11 +99,10 @@ export const ProductList: React.FC<ProductListProps> = ({
 
         <div
           onClick={() => setOnlyLowStock(!onlyLowStock)}
-          className={`glass-panel p-5 rounded-2xl border cursor-pointer transition-all ${
-            onlyLowStock
+          className={`glass-panel p-5 rounded-2xl border cursor-pointer transition-all ${onlyLowStock
               ? 'border-amber-500/80 bg-amber-500/10 shadow-lg shadow-amber-500/10'
               : 'border-slate-800 hover:border-amber-500/40'
-          } flex items-center justify-between`}
+            } flex items-center justify-between`}
         >
           <div>
             <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">¡Se están acabando!</span>
@@ -121,11 +123,10 @@ export const ProductList: React.FC<ProductListProps> = ({
           <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">Filtrar:</span>
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-              selectedCategory === 'all'
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${selectedCategory === 'all'
                 ? 'bg-indigo-600 text-white shadow-md'
                 : 'bg-slate-950/60 text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             Todos ({filteredProducts.length})
           </button>
@@ -133,24 +134,32 @@ export const ProductList: React.FC<ProductListProps> = ({
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                selectedCategory === cat
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${selectedCategory === cat
                   ? 'bg-indigo-600 text-white shadow-md'
                   : 'bg-slate-950/60 text-slate-400 hover:text-white'
-              }`}
+                }`}
             >
               {cat}
             </button>
           ))}
         </div>
 
-        <button
-          onClick={onOpenNewProductModal}
-          className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all w-full sm:w-auto justify-center"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Agregar Producto</span>
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={onOpenImportModal}
+            className="flex items-center space-x-2 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all w-full sm:w-auto justify-center"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Importar Excel</span>
+          </button>
+          <button
+            onClick={onOpenNewProductModal}
+            className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all w-full sm:w-auto justify-center"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Agregar Producto</span>
+          </button>
+        </div>
       </div>
 
       {/* Product Cards */}
@@ -214,9 +223,8 @@ export const ProductList: React.FC<ProductListProps> = ({
                     </div>
                     <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          isLowStock ? 'bg-amber-500' : 'bg-gradient-to-r from-emerald-500 to-indigo-500'
-                        }`}
+                        className={`h-full rounded-full transition-all ${isLowStock ? 'bg-amber-500' : 'bg-gradient-to-r from-emerald-500 to-indigo-500'
+                          }`}
                         style={{
                           width: `${Math.min(100, (product.stock / (product.minStockAlert * 3)) * 100)}%`
                         }}

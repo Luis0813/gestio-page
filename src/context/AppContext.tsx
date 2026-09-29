@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import type {
   FinancialPeriod,
   Product,
@@ -10,20 +10,21 @@ import type {
   FinancialBalanceSummary
 } from '../types';
 import {
-  INITIAL_PRODUCTS,
-  INITIAL_RAW_MATERIALS,
-  INITIAL_EXPENSES,
-  INITIAL_PAYROLL,
-  INITIAL_MOVEMENTS,
-  INITIAL_CUSTOMERS
-} from '../data/mockData';
+  productsApi,
+  rawMaterialsApi,
+  expensesApi,
+  payrollApi,
+  customersApi,
+  stockMovementsApi,
+  dataApi,
+} from '../api/resources';
 import { useAuth } from './AuthContext';
 import type { ToastMessage } from '../components/Toast';
 
 interface AppContextType {
   financialPeriod: FinancialPeriod;
   setFinancialPeriod: (period: FinancialPeriod) => void;
-  
+
   products: Product[];
   filteredProducts: Product[];
   rawMaterials: RawMaterial[];
@@ -32,32 +33,35 @@ interface AppContextType {
   movements: StockMovement[];
   customers: Customer[];
 
+  isLoading: boolean;
+
   // Notifications & Utilities
   toasts: ToastMessage[];
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
-  resetDemoData: () => void;
+  resetDemoData: () => Promise<void>;
+  refreshData: () => Promise<void>;
 
   // Actions
-  addProduct: (product: Omit<Product, 'id'>) => void;
-  updateProduct: (product: Product) => void;
-  deleteProduct: (id: string) => void;
-  
-  addRawMaterial: (material: Omit<RawMaterial, 'id'>) => void;
-  updateRawMaterial: (material: RawMaterial) => void;
-  deleteRawMaterial: (id: string) => void;
+  addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
+  updateProduct: (product: Product) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
 
-  addExpense: (expense: Omit<Expense, 'id'>) => void;
-  deleteExpense: (id: string) => void;
+  addRawMaterial: (material: Omit<RawMaterial, 'id'>) => Promise<void>;
+  updateRawMaterial: (material: RawMaterial) => Promise<void>;
+  deleteRawMaterial: (id: string) => Promise<void>;
 
-  addPayrollEntry: (entry: Omit<WorkerPayroll, 'id'>) => void;
-  deletePayrollEntry: (id: string) => void;
+  addExpense: (expense: Omit<Expense, 'id'>) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
 
-  addCustomer: (customer: Omit<Customer, 'id' | 'totalOrders' | 'totalSpent' | 'lastOrderDate'>) => void;
-  updateCustomer: (customer: Customer) => void;
-  deleteCustomer: (id: string) => void;
+  addPayrollEntry: (entry: Omit<WorkerPayroll, 'id'>) => Promise<void>;
+  deletePayrollEntry: (id: string) => Promise<void>;
 
-  addStockMovement: (movement: Omit<StockMovement, 'id'>) => void;
+  addCustomer: (customer: Omit<Customer, 'id' | 'totalOrders' | 'totalSpent' | 'lastOrderDate'>) => Promise<void>;
+  updateCustomer: (customer: Customer) => Promise<void>;
+  deleteCustomer: (id: string) => Promise<void>;
+
+  addStockMovement: (movement: Omit<StockMovement, 'id'>) => Promise<void>;
 
   calculateRecipeCost: (recipe: { rawMaterialId: string; quantityNeeded: number }[]) => number;
   financialSummary: FinancialBalanceSummary;
@@ -66,11 +70,11 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const userId = user ? user.id : 'guest';
+  const { user, token } = useAuth();
 
   const [financialPeriod, setFinancialPeriod] = useState<FinancialPeriod>('mensual');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
@@ -79,273 +83,305 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
-  // Load user-scoped data whenever logged-in user changes (Multi-Tenancy Data Isolation)
-  useEffect(() => {
-    const savedProducts = localStorage.getItem(`gestio_products_${userId}`);
-    setProducts(savedProducts ? JSON.parse(savedProducts) : INITIAL_PRODUCTS);
-
-    const savedRaw = localStorage.getItem(`gestio_raw_materials_${userId}`);
-    setRawMaterials(savedRaw ? JSON.parse(savedRaw) : INITIAL_RAW_MATERIALS);
-
-    const savedExp = localStorage.getItem(`gestio_expenses_${userId}`);
-    setExpenses(savedExp ? JSON.parse(savedExp) : INITIAL_EXPENSES);
-
-    const savedPay = localStorage.getItem(`gestio_payroll_${userId}`);
-    setPayroll(savedPay ? JSON.parse(savedPay) : INITIAL_PAYROLL);
-
-    const savedMov = localStorage.getItem(`gestio_movements_${userId}`);
-    setMovements(savedMov ? JSON.parse(savedMov) : INITIAL_MOVEMENTS);
-
-    const savedCust = localStorage.getItem(`gestio_customers_${userId}`);
-    setCustomers(savedCust ? JSON.parse(savedCust) : INITIAL_CUSTOMERS);
-  }, [userId]);
-
-  // Sync user-scoped data to local storage per company
-  useEffect(() => {
-    if (userId !== 'guest') {
-      localStorage.setItem(`gestio_products_${userId}`, JSON.stringify(products));
-    }
-  }, [products, userId]);
-
-  useEffect(() => {
-    if (userId !== 'guest') {
-      localStorage.setItem(`gestio_raw_materials_${userId}`, JSON.stringify(rawMaterials));
-    }
-  }, [rawMaterials, userId]);
-
-  useEffect(() => {
-    if (userId !== 'guest') {
-      localStorage.setItem(`gestio_expenses_${userId}`, JSON.stringify(expenses));
-    }
-  }, [expenses, userId]);
-
-  useEffect(() => {
-    if (userId !== 'guest') {
-      localStorage.setItem(`gestio_payroll_${userId}`, JSON.stringify(payroll));
-    }
-  }, [payroll, userId]);
-
-  useEffect(() => {
-    if (userId !== 'guest') {
-      localStorage.setItem(`gestio_movements_${userId}`, JSON.stringify(movements));
-    }
-  }, [movements, userId]);
-
-  useEffect(() => {
-    if (userId !== 'guest') {
-      localStorage.setItem(`gestio_customers_${userId}`, JSON.stringify(customers));
-    }
-  }, [customers, userId]);
+  // Request sequence token to guard against race conditions on user switch
+  const requestSeqRef = useRef(0);
 
   // Toast Helpers
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = `toast-${Date.now()}`;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
-      dismissToast(id);
+      setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
-  };
+  }, []);
 
-  const dismissToast = (id: string) => {
+  const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
+  }, []);
 
-  // Reset Demo Data
-  const resetDemoData = () => {
-    setProducts(INITIAL_PRODUCTS);
-    setRawMaterials(INITIAL_RAW_MATERIALS);
-    setExpenses(INITIAL_EXPENSES);
-    setPayroll(INITIAL_PAYROLL);
-    setMovements(INITIAL_MOVEMENTS);
-    setCustomers(INITIAL_CUSTOMERS);
-    localStorage.clear();
-    showToast('🔄 Datos de demostración restaurados exitosamente', 'info');
-  };
+  // Guard: require authenticated user
+  const requireAuth = useCallback((): boolean => {
+    if (!user || !token) {
+      showToast('Debes iniciar sesión para modificar los datos.', 'error');
+      return false;
+    }
+    return true;
+  }, [user, token, showToast]);
+
+  // Load all data from Rails API
+  const refreshData = useCallback(async () => {
+    if (!user || !token) return;
+
+    const currentSeq = ++requestSeqRef.current;
+    setIsLoading(true);
+    try {
+      const [prods, mats, exps, pays, movs, custs] = await Promise.all([
+        productsApi.list(),
+        rawMaterialsApi.list(),
+        expensesApi.list(),
+        payrollApi.list(),
+        stockMovementsApi.list(),
+        customersApi.list(),
+      ]);
+      // Guard against state updates after unmount or user switch
+      if (currentSeq !== requestSeqRef.current) return;
+      setProducts(prods);
+      setRawMaterials(mats);
+      setExpenses(exps);
+      setPayroll(pays);
+      setMovements(movs);
+      setCustomers(custs);
+    } catch (err: any) {
+      if (currentSeq !== requestSeqRef.current) return;
+      console.error('Error loading data from API:', err);
+      showToast(`❌ Error al cargar datos: ${err.message}`, 'error');
+    } finally {
+      if (currentSeq === requestSeqRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, [user, token, showToast]);
+
+  // Load data when user logs in
+  useEffect(() => {
+    if (user && token) {
+      refreshData();
+    } else {
+      // Clear local state on logout
+      setProducts([]);
+      setRawMaterials([]);
+      setExpenses([]);
+      setPayroll([]);
+      setMovements([]);
+      setCustomers([]);
+    }
+  }, [user, token, refreshData]);
+
+  // Reset Data (calls backend DELETE /data then refreshes)
+  const resetDemoData = useCallback(async () => {
+    if (!requireAuth()) return;
+    setIsLoading(true);
+    try {
+      await dataApi.reset();
+      await refreshData();
+      showToast('🔄 Datos de demostración restaurados exitosamente', 'info');
+    } catch (err: any) {
+      showToast(`❌ Error al restablecer datos: ${err.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [requireAuth, refreshData, showToast]);
 
   const filteredProducts = products;
 
   // Recipe cost calculator
-  const calculateRecipeCost = (recipe: { rawMaterialId: string; quantityNeeded: number }[]) => {
+  const calculateRecipeCost = useCallback((recipe: { rawMaterialId: string; quantityNeeded: number }[]) => {
     return recipe.reduce((total, item) => {
       const rm = rawMaterials.find((r) => r.id === item.rawMaterialId);
       if (!rm) return total;
       return total + rm.costPerUnit * item.quantityNeeded;
     }, 0);
-  };
+  }, [rawMaterials]);
 
-  // Product CRUD
-  const addProduct = (productData: Omit<Product, 'id'>) => {
-    const newProduct: Product = {
-      ...productData,
-      id: `prod-${Date.now()}`
-    };
-    setProducts((prev) => [newProduct, ...prev]);
-    showToast(`✅ Producto "${productData.name}" agregado al inventario`, 'success');
-  };
+  // ===================== Product CRUD =====================
 
-  const updateProduct = (updatedProduct: Product) => {
-    setProducts((prev) => prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
-    showToast(`✏️ Producto "${updatedProduct.name}" actualizado correctamente`, 'success');
-  };
+  const addProduct = useCallback(async (productData: Omit<Product, 'id'>) => {
+    if (!requireAuth()) return;
+    try {
+      const created = await productsApi.create(productData);
+      setProducts((prev) => [created, ...prev]);
+      showToast(`✅ Producto "${productData.name}" agregado al inventario`, 'success');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
 
-  const deleteProduct = (id: string) => {
+  const updateProduct = useCallback(async (updatedProduct: Product) => {
+    if (!requireAuth()) return;
+    try {
+      const updated = await productsApi.update(updatedProduct);
+      setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      showToast(`✏️ Producto "${updated.name}" actualizado correctamente`, 'success');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
+
+  const deleteProduct = useCallback(async (id: string) => {
+    if (!requireAuth()) return;
     const prod = products.find((p) => p.id === id);
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    showToast(`🗑️ Producto "${prod?.name || 'eliminado'}" fue removido`, 'info');
-  };
+    try {
+      await productsApi.remove(id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      showToast(`🗑️ Producto "${prod?.name || 'eliminado'}" fue removido`, 'info');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [products, requireAuth, showToast]);
 
-  // Raw Material CRUD
-  const addRawMaterial = (matData: Omit<RawMaterial, 'id'>) => {
-    const newMat: RawMaterial = {
-      ...matData,
-      id: `rm-${Date.now()}`
-    };
-    setRawMaterials((prev) => [newMat, ...prev]);
-    showToast(`🥩 Insumo "${matData.name}" registrado en stock`, 'success');
-  };
+  // ===================== Raw Material CRUD =====================
 
-  const updateRawMaterial = (updatedMat: RawMaterial) => {
-    setRawMaterials((prev) => prev.map((m) => (m.id === updatedMat.id ? updatedMat : m)));
-    showToast(`✏️ Insumo "${updatedMat.name}" actualizado`, 'success');
-  };
+  const addRawMaterial = useCallback(async (matData: Omit<RawMaterial, 'id'>) => {
+    if (!requireAuth()) return;
+    try {
+      const created = await rawMaterialsApi.create(matData);
+      setRawMaterials((prev) => [created, ...prev]);
+      showToast(`🥩 Insumo "${matData.name}" registrado en stock`, 'success');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
 
-  const deleteRawMaterial = (id: string) => {
-    setRawMaterials((prev) => prev.filter((m) => m.id !== id));
-    showToast(`🗑️ Insumo eliminado`, 'info');
-  };
+  const updateRawMaterial = useCallback(async (updatedMat: RawMaterial) => {
+    if (!requireAuth()) return;
+    try {
+      const updated = await rawMaterialsApi.update(updatedMat);
+      setRawMaterials((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      showToast(`✏️ Insumo "${updated.name}" actualizado`, 'success');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
 
-  // Expense CRUD
-  const addExpense = (expenseData: Omit<Expense, 'id'>) => {
-    const newExpense: Expense = {
-      ...expenseData,
-      id: `exp-${Date.now()}`
-    };
-    setExpenses((prev) => [newExpense, ...prev]);
-    showToast(`💸 Gasto de $${expenseData.amount.toFixed(2)} registrado (${expenseData.category})`, 'success');
-  };
+  const deleteRawMaterial = useCallback(async (id: string) => {
+    if (!requireAuth()) return;
+    try {
+      await rawMaterialsApi.remove(id);
+      setRawMaterials((prev) => prev.filter((m) => m.id !== id));
+      showToast(`🗑️ Insumo eliminado`, 'info');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
 
-  const deleteExpense = (id: string) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
-    showToast(`🗑️ Gasto eliminado`, 'info');
-  };
+  // ===================== Expense CRUD =====================
 
-  // Payroll CRUD
-  const addPayrollEntry = (entryData: Omit<WorkerPayroll, 'id'>) => {
-    const newEntry: WorkerPayroll = {
-      ...entryData,
-      id: `pay-${Date.now()}`
-    };
-    setPayroll((prev) => [newEntry, ...prev]);
-    showToast(`👷 Pago de $${entryData.totalPaid.toFixed(2)} registrado para ${entryData.workerName}`, 'success');
-  };
+  const addExpense = useCallback(async (expenseData: Omit<Expense, 'id'>) => {
+    if (!requireAuth()) return;
+    try {
+      const created = await expensesApi.create(expenseData);
+      setExpenses((prev) => [created, ...prev]);
+      showToast(`💸 Gasto de $${expenseData.amount.toFixed(2)} registrado (${expenseData.category})`, 'success');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
 
-  const deletePayrollEntry = (id: string) => {
-    setPayroll((prev) => prev.filter((p) => p.id !== id));
-    showToast(`🗑️ Registro de pago eliminado`, 'info');
-  };
+  const deleteExpense = useCallback(async (id: string) => {
+    if (!requireAuth()) return;
+    try {
+      await expensesApi.remove(id);
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+      showToast(`🗑️ Gasto eliminado`, 'info');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
 
-  // Customer CRUD
-  const addCustomer = (customerData: Omit<Customer, 'id' | 'totalOrders' | 'totalSpent' | 'lastOrderDate'>) => {
-    const newCustomer: Customer = {
-      ...customerData,
-      id: `cli-${Date.now()}`,
-      totalOrders: 0,
-      totalSpent: 0,
-      lastOrderDate: new Date().toISOString().split('T')[0]
-    };
-    setCustomers((prev) => [newCustomer, ...prev]);
-    showToast(`👤 Cliente "${customerData.name}" registrado con éxito`, 'success');
-  };
+  // ===================== Payroll CRUD =====================
 
-  const updateCustomer = (updatedCustomer: Customer) => {
-    setCustomers((prev) => prev.map((c) => (c.id === updatedCustomer.id ? updatedCustomer : c)));
-    showToast(`✏️ Cliente "${updatedCustomer.name}" actualizado`, 'success');
-  };
+  const addPayrollEntry = useCallback(async (entryData: Omit<WorkerPayroll, 'id'>) => {
+    if (!requireAuth()) return;
+    try {
+      const created = await payrollApi.create(entryData);
+      setPayroll((prev) => [created, ...prev]);
+      showToast(`👷 Pago de $${entryData.totalPaid.toFixed(2)} registrado para ${entryData.workerName}`, 'success');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
 
-  const deleteCustomer = (id: string) => {
+  const deletePayrollEntry = useCallback(async (id: string) => {
+    if (!requireAuth()) return;
+    try {
+      await payrollApi.remove(id);
+      setPayroll((prev) => prev.filter((p) => p.id !== id));
+      showToast(`🗑️ Registro de pago eliminado`, 'info');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
+
+  // ===================== Customer CRUD =====================
+
+  const addCustomer = useCallback(async (customerData: Omit<Customer, 'id' | 'totalOrders' | 'totalSpent' | 'lastOrderDate'>) => {
+    if (!requireAuth()) return;
+    try {
+      // Server will initialize totalOrders, totalSpent, lastOrderDate
+      const created = await customersApi.create(customerData as Omit<Customer, 'id'>);
+      setCustomers((prev) => [created, ...prev]);
+      showToast(`👤 Cliente "${customerData.name}" registrado con éxito`, 'success');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
+
+  const updateCustomer = useCallback(async (updatedCustomer: Customer) => {
+    if (!requireAuth()) return;
+    try {
+      const updated = await customersApi.update(updatedCustomer);
+      setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      showToast(`✏️ Cliente "${updated.name}" actualizado`, 'success');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [requireAuth, showToast]);
+
+  const deleteCustomer = useCallback(async (id: string) => {
+    if (!requireAuth()) return;
     const cli = customers.find((c) => c.id === id);
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
-    showToast(`🗑️ Cliente "${cli?.name || ''}" eliminado`, 'info');
-  };
+    try {
+      await customersApi.remove(id);
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+      showToast(`🗑️ Cliente "${cli?.name || ''}" eliminado`, 'info');
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
+    }
+  }, [customers, requireAuth, showToast]);
 
-  // Stock Movement CRUD & Customer Stats Updating
-  const addStockMovement = (movData: Omit<StockMovement, 'id'>) => {
-    const newMov: StockMovement = {
-      ...movData,
-      id: `mov-${Date.now()}`
-    };
-    setMovements((prev) => [newMov, ...prev]);
+  // ===================== Stock Movement =====================
 
-    // Adjust product stock
-    setProducts((prevProducts) =>
-      prevProducts.map((p) => {
-        if (p.id === movData.productId) {
-          let updatedStock = p.stock;
-          if (movData.type === 'Venta' || movData.type === 'Merma / Pérdida') {
-            updatedStock = Math.max(0, p.stock - movData.quantity);
-          } else if (movData.type === 'Compra Insumos' || movData.type === 'Ajuste Stock') {
-            updatedStock = p.stock + movData.quantity;
+  const addStockMovement = useCallback(async (movData: Omit<StockMovement, 'id'>) => {
+    if (!requireAuth()) return;
+    try {
+      const result = await stockMovementsApi.create(movData);
+
+      // Add the new movement to local state
+      setMovements((prev) => [result.movement, ...prev]);
+
+      // Update product stock from server response
+      if (result.product) {
+        setProducts((prevProducts) =>
+          prevProducts.map((p) => (p.id === result.product!.id ? result.product! : p))
+        );
+      }
+
+      // Update customer from server response (for sales)
+      if (result.customer) {
+        setCustomers((prevCustomers) => {
+          const exists = prevCustomers.some((c) => c.id === result.customer!.id);
+          if (exists) {
+            return prevCustomers.map((c) => (c.id === result.customer!.id ? result.customer! : c));
           }
-          return { ...p, stock: updatedStock };
-        }
-        return p;
-      })
-    );
-
-    // If movement is Venta and customer is specified, update customer spending & orders count
-    if (movData.type === 'Venta' && (movData.customerId || movData.customerName)) {
-      setCustomers((prevCustomers) => {
-        const todayStr = movData.date || new Date().toISOString().split('T')[0];
-        let found = false;
-
-        const updated = prevCustomers.map((c) => {
-          if (movData.customerId && c.id === movData.customerId) {
-            found = true;
-            return {
-              ...c,
-              totalOrders: c.totalOrders + 1,
-              totalSpent: c.totalSpent + movData.totalAmount,
-              lastOrderDate: todayStr
-            };
-          }
-          if (!movData.customerId && movData.customerName && c.name.toLowerCase() === movData.customerName.toLowerCase()) {
-            found = true;
-            return {
-              ...c,
-              totalOrders: c.totalOrders + 1,
-              totalSpent: c.totalSpent + movData.totalAmount,
-              lastOrderDate: todayStr
-            };
-          }
-          return c;
+          // New customer was created by the server
+          return [result.customer!, ...prevCustomers];
         });
+      }
 
-        // If customer was entered by name but not existing in state, create new customer
-        if (!found && movData.customerName) {
-          const newCli: Customer = {
-            id: `cli-${Date.now()}`,
-            name: movData.customerName,
-            totalOrders: 1,
-            totalSpent: movData.totalAmount,
-            lastOrderDate: todayStr
-          };
-          return [newCli, ...updated];
-        }
-        return updated;
-      });
+      if (movData.type === 'Venta') {
+        const cliText = movData.customerName ? ` a ${movData.customerName}` : '';
+        showToast(`🎉 Venta de ${movData.quantity}u. de "${movData.productName}"${cliText} (+$${movData.totalAmount.toFixed(2)})`, 'success');
+      } else {
+        showToast(`📦 Movimiento (${movData.type}) registrado exitosamente`, 'info');
+      }
+    } catch (err: any) {
+      showToast(`❌ ${err.message}`, 'error');
     }
-
-    if (movData.type === 'Venta') {
-      const cliText = movData.customerName ? ` a ${movData.customerName}` : '';
-      showToast(`🎉 Venta de ${movData.quantity}u. de "${movData.productName}"${cliText} (+$${movData.totalAmount.toFixed(2)})`, 'success');
-    } else {
-      showToast(`📦 Movimiento (${movData.type}) registrado exitosamente`, 'info');
-    }
-  };
+  }, [requireAuth, showToast]);
 
   // Financial Balance summary based on selected period
   const financialSummary = useMemo((): FinancialBalanceSummary => {
-    const now = new Date('2026-08-30');
+    const now = new Date();
     let daysToSubtract = 365;
 
     if (financialPeriod === 'semanal') daysToSubtract = 7;
@@ -404,10 +440,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         payroll,
         movements,
         customers,
+        isLoading,
         toasts,
         showToast,
         dismissToast,
         resetDemoData,
+        refreshData,
         addProduct,
         updateProduct,
         deleteProduct,

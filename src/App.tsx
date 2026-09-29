@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import api from './api';
+import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/Sidebar';
@@ -11,6 +10,7 @@ import { AccountDisabled } from './components/Auth/AccountDisabled';
 
 import { ProductList } from './components/Inventory/ProductList';
 import { ProductFormModal } from './components/Inventory/ProductFormModal';
+import { ProductImportModal } from './components/Inventory/ProductImportModal';
 import { RecipeCalculatorModal } from './components/Inventory/RecipeCalculatorModal';
 import { StockMovementModal } from './components/Inventory/StockMovementModal';
 
@@ -32,9 +32,9 @@ const MainApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('financials');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [checkingStatus, setCheckingStatus] = useState(false);
 
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
+  const [isProductImportModalOpen, setIsProductImportModalOpen] = useState<boolean>(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
   const [recipeProduct, setRecipeProduct] = useState<Product | null>(null);
@@ -71,35 +71,7 @@ const MainApp: React.FC = () => {
     await logout();
   };
 
-  // Check account status on load if user is logged in
-  useEffect(() => {
-    async function checkAccountStatus() {
-      if (user && !checkingStatus) {
-        setCheckingStatus(true);
-        try {
-          const token = localStorage.getItem('gestio_token');
-          if (token) {
-            try {
-              await api.get('/me');
-            } catch (err: any) {
-              if (err.response?.status === 401 || err.response?.status === 403) {
-                // Account is disabled or token invalid/expired, clear session
-                await logout();
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Error checking account status:', err);
-        } finally {
-          setCheckingStatus(false);
-        }
-      }
-    }
-
-    checkAccountStatus();
-  }, [user]);
-
-  if (isLoading || checkingStatus) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-white text-lg">Cargando...</div>
@@ -141,6 +113,7 @@ const MainApp: React.FC = () => {
               searchTerm={searchTerm}
               onEditProduct={handleEditProduct}
               onOpenNewProductModal={handleOpenNewProductModal}
+              onOpenImportModal={() => setIsProductImportModalOpen(true)}
               onOpenRecipeModal={handleOpenRecipeModal}
               onOpenMovementModal={handleOpenMovementModal}
             />
@@ -159,6 +132,11 @@ const MainApp: React.FC = () => {
         isOpen={isProductModalOpen}
         onClose={() => setIsProductModalOpen(false)}
         productToEdit={productToEdit}
+      />
+
+      <ProductImportModal
+        isOpen={isProductImportModalOpen}
+        onClose={() => setIsProductImportModalOpen(false)}
       />
 
       <RecipeCalculatorModal

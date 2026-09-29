@@ -46,12 +46,12 @@ export const CustomerManager: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
     if (editingCustomer) {
-      updateCustomer({
+      await updateCustomer({
         ...editingCustomer,
         name,
         phone: phone || undefined,
@@ -60,7 +60,7 @@ export const CustomerManager: React.FC = () => {
         notes: notes || undefined
       });
     } else {
-      addCustomer({
+      await addCustomer({
         name,
         phone: phone || undefined,
         email: email || undefined,

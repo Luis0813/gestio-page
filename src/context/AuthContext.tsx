@@ -36,18 +36,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         async function loadStorageData() {
             try {
                 const storedToken = localStorage.getItem('gestio_token');
-                const storedUser = localStorage.getItem('gestio_user');
 
-                if (storedToken && storedUser) {
-                    // Verify token with backend
+                if (storedToken) {
+                    // Verify token with backend and get user from /me
                     try {
-                        await api.get('/me');
+                        const response = await api.get('/me');
                         setToken(storedToken);
-                        setUser(JSON.parse(storedUser));
+                        setUser(response.data.data);
                     } catch (err) {
                         // Stale or expired token
                         localStorage.removeItem('gestio_token');
-                        localStorage.removeItem('gestio_user');
                     }
                 }
             } catch (e) {
@@ -68,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error) {
             console.error('Logout request failed:', error);
         } finally {
-            localStorage.clear();
+            localStorage.removeItem('gestio_token');
             setToken(null);
             setUser(null);
             setIsAccountDisabled(false);
@@ -108,13 +106,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const authHeader: string = typeof headers.authorization === 'string'
                 ? headers.authorization
                 : typeof headers.get === 'function'
-                ? headers.get('authorization')
-                : '';
+                    ? headers.get('authorization')
+                    : '';
             const tokenString = authHeader ? authHeader.replace('Bearer ', '') : '';
 
             if (tokenString) {
                 localStorage.setItem('gestio_token', tokenString);
-                localStorage.setItem('gestio_user', JSON.stringify(response.data.data));
                 setToken(tokenString);
                 setUser(response.data.data);
                 setIsAccountDisabled(false);
@@ -150,13 +147,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const authHeader: string = typeof headers.authorization === 'string'
                 ? headers.authorization
                 : typeof headers.get === 'function'
-                ? headers.get('authorization')
-                : '';
+                    ? headers.get('authorization')
+                    : '';
             const tokenString = authHeader ? authHeader.replace('Bearer ', '') : '';
 
             if (tokenString) {
                 localStorage.setItem('gestio_token', tokenString);
-                localStorage.setItem('gestio_user', JSON.stringify(response.data.data));
                 setToken(tokenString);
                 setUser(response.data.data);
                 setIsAccountDisabled(false);

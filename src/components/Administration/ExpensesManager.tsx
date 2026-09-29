@@ -26,11 +26,11 @@ export const ExpensesManager: React.FC = () => {
 
   const totalExpensesAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) return;
 
-    addExpense({
+    await addExpense({
       description,
       category,
       amount: Number(amount),

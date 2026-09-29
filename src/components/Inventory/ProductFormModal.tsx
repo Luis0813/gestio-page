@@ -14,7 +14,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onClose,
   productToEdit
 }) => {
-  const { addProduct, updateProduct, rawMaterials } = useApp();
+  const { addProduct, updateProduct, rawMaterials, showToast } = useApp();
 
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
@@ -121,9 +121,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setCostPrice(Number(total.toFixed(2)));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    // Only the name and the two prices are mandatory; the API fills the rest.
+    if (!name.trim()) {
+      showToast('El nombre del producto es obligatorio.', 'error');
+      return;
+    }
+    if (!Number.isFinite(costPrice) || costPrice < 0 || !Number.isFinite(salePrice) || salePrice < 0) {
+      showToast('Ingresa un precio de inversión y un precio de venta válidos.', 'error');
+      return;
+    }
 
     const attributesObj: Record<string, string> = {};
     customFields.forEach((item) => {
@@ -147,9 +155,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     };
 
     if (productToEdit) {
-      updateProduct({ ...productPayload, id: productToEdit.id });
+      await updateProduct({ ...productPayload, id: productToEdit.id });
     } else {
-      addProduct(productPayload);
+      await addProduct(productPayload);
     }
 
     onClose();
@@ -350,29 +358,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-semibold text-slate-300 mb-1 block">
-                  {useRawMaterialsForCost ? 'Costo Calculado de Materias Primas ($)' : 'Costo Directo de Producción / Compra ($)'}
+                  {useRawMaterialsForCost ? 'Costo Calculado de Materias Primas ($)' : 'Costo Directo de Producción / Compra ($) *'}
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
+                  required
                   readOnly={useRawMaterialsForCost}
                   value={costPrice}
                   onChange={(e) => setCostPrice(Number(e.target.value))}
-                  className={`w-full border rounded-xl px-3 py-2 text-xs font-bold ${
-                    useRawMaterialsForCost
-                      ? 'bg-amber-950/40 border-amber-500/40 text-amber-300 cursor-not-allowed'
-                      : 'bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500'
-                  }`}
+                  className={`w-full border rounded-xl px-3 py-2 text-xs font-bold ${useRawMaterialsForCost
+                    ? 'bg-amber-950/40 border-amber-500/40 text-amber-300 cursor-not-allowed'
+                    : 'bg-slate-950 border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500'
+                    }`}
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-emerald-400 mb-1 block">Precio de Venta al Público ($)</label>
+                <label className="text-xs font-semibold text-emerald-400 mb-1 block">Precio de Venta al Público ($) *</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
+                  required
                   value={salePrice}
                   onChange={(e) => setSalePrice(Number(e.target.value))}
                   className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2 text-xs text-emerald-400 focus:outline-none focus:border-emerald-500 font-black text-sm"
@@ -404,7 +413,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <label className="text-xs font-semibold text-amber-400 mb-1 block">Alerta de Stock Mínimo</label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 value={minStockAlert}
                 onChange={(e) => setMinStockAlert(Number(e.target.value))}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-amber-300 focus:outline-none focus:border-amber-500 font-bold"

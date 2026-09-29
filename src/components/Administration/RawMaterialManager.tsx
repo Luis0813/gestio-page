@@ -47,7 +47,7 @@ export const RawMaterialManager: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
@@ -62,9 +62,9 @@ export const RawMaterialManager: React.FC = () => {
     };
 
     if (editingMat) {
-      updateRawMaterial({ ...payload, id: editingMat.id });
+      await updateRawMaterial({ ...payload, id: editingMat.id });
     } else {
-      addRawMaterial(payload);
+      await addRawMaterial(payload);
     }
     setIsModalOpen(false);
   };
