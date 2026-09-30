@@ -120,7 +120,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return { success: false, error: 'No token returned from server.' };
         } catch (error: any) {
             const err = error as AxiosError<any>;
-            if (err.response?.status === 403) {
+            if (!err.response) {
+                // Sin respuesta del servidor: CORS, backend caído o instancia
+                // de Render suspendida. No tiene sentido mostrar "creenciales
+                // inválidas" porque nunca hubo respuesta que las validara.
+                console.error('Network error connecting to backend:', err);
+                return {
+                    success: false,
+                    error: 'No se pudo conectar con el servidor. Intenta de nuevo en unos segundos.'
+                };
+            }
+            if (err.response.status === 403) {
                 setIsAccountDisabled(true);
                 return { success: false, error: err.response.data?.status?.message || 'Your account has been disabled.', disabled: true };
             } else {
